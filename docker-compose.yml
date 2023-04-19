@@ -1,0 +1,80 @@
+---
+version: '3.7'
+services:
+  zookeeper1_legacy:
+    image: zookeeper:3.5.9
+    hostname: zookeeper1_legacy
+    container_name: zookeeper1_legacy
+    restart: always
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  broker1_legacy:
+    image: wurstmeister/kafka:1.0.0
+    hostname: broker1_legacy
+    container_name: broker1_legacy
+    ports:
+      - "19192:19192"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper1_legacy:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'BROKER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      # https://github.com/wurstmeister/kafka-docker/tree/1.0.0#listener-configuration
+      KAFKA_ADVERTISED_PROTOCOL_NAME: 'PLAINTEXT_HOST'
+      KAFKA_ADVERTISED_HOST_NAME: localhost
+      KAFKA_ADVERTISED_PORT: 19192
+      KAFKA_PROTOCOL_NAME: BROKER
+      KAFKA_HOST_NAME: broker1_legacy
+      KAFKA_PORT: 9092
+
+  zookeeper1:
+    image: confluentinc/cp-zookeeper:7.3.3
+    hostname: zookeeper1
+    container_name: zookeeper1
+    restart: always  
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  broker1:
+    image: confluentinc/cp-kafka:7.3.3
+    hostname: broker1
+    container_name: broker1
+    ports:
+      - "29192:29192"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper1:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: BROKER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: BROKER://:9092,PLAINTEXT_HOST://:29192
+      KAFKA_ADVERTISED_LISTENERS: BROKER://broker1:9092,PLAINTEXT_HOST://localhost:29192
+      KAFKA_INTER_BROKER_LISTENER_NAME: BROKER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CONFLUENT_METRICS_ENABLE: 'false'
+
+  connect:
+    image: confluentinc/cp-enterprise-replicator:7.3.3
+    hostname: connect
+    container_name: connect
+    restart: always
+    depends_on:
+      - broker1
+    ports:
+      - "8083:8083"
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: 'broker1:9092'
+      CONNECT_REST_ADVERTISED_HOST_NAME: connect
+      CONNECT_GROUP_ID: "connect-cluster"
+      CONNECT_PRODUCER_CLIENT_ID: "connect-worker-producer"
+      CONNECT_CLIENT_ID: "connect-adminclient-producer"
+      CONNECT_CONFIG_STORAGE_TOPIC: connect-configs
+      CONNECT_OFFSET_STORAGE_TOPIC: connect-offsets
+      CONNECT_STATUS_STORAGE_TOPIC: connect-status
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_CONNECTOR_CLIENT_CONFIG_OVERRIDE_POLICY: All
+      CONNECT_LOG4J_APPENDER_STDOUT_LAYOUT_CONVERSIONPATTERN: "[%d] %p %X{connector.context}%m (%c:%L)%n"
